@@ -53,8 +53,39 @@ calentamiento que se descarta.
 tamaños pequeños se incluyeron para ver en qué punto exacto las estructuras
 empiezan a diferenciarse.
 
-**Equipo donde corrí esto.** Windows 10, Python 3.10, procesador [COMPLETAR],
-[COMPLETAR] GB de RAM.
+**Equipo donde corrí esto.** Portátil con Windows 10, Python 3.10, procesador
+Intel Core i3-1005G1 a 1.20 GHz (4 procesadores lógicos), 16 GB de RAM
+(15,8 GB usables), disco SSD. Estaba enchufado a la corriente durante toda la
+prueba, con el modo de energía normal y con las aplicaciones pesadas cerradas.
+
+---
+
+## Decisiones del experimento
+
+- **Búsquedas con repetición.** Los IDs a buscar se eligen con `random.choices`,
+  así que un ID puede repetirse. En cada repetición las tres estructuras buscan
+  exactamente los mismos IDs, para que la comparación sea justa.
+
+- **Datos y semillas.** La semilla cambia en cada repetición. Así los datos
+  varían entre repeticiones, pero las tres estructuras reciben los mismos datos
+  dentro de una misma repetición.
+
+- **Estadísticas.** Promedio, desviación estándar muestral (con n−1), mediana y
+  mínimo, sobre 5 repeticiones.
+
+- **Valores atípicos.** No se eliminó ningún dato. Se reportan mediana y mínimo
+  junto al promedio para poder detectar si alguna repetición salió rara. Las
+  mediciones más cortas (N pequeño en rango y listar todos, de pocos
+  microsegundos) son las más ruidosas.
+
+- **Rango.** Ancho = min(100, N). Para N ≤ 100 el rango equivale a listar todos.
+
+- **Altura.** La altura guardada en el CSV es la de la última repetición. Por
+  eso la altura del ABB aleatorio no siempre crece con N (puede dar 31 con
+  N = 5000 y 28 con N = 10000).
+
+- **Límites del equipo.** Es un procesador de bajo consumo; no se controló la
+  frecuencia, así que los tiempos absolutos pueden variar entre ejecuciones.
 
 ---
 
@@ -73,38 +104,79 @@ Todas las gráficas están en la carpeta `graficas/`. Las más importantes son:
   construirse que las otras dos. Es porque cada inserción recorre toda la rama
   derecha.
 
+### Descripción de cada gráfica
+
+Todas usan escala logarítmica en ambos ejes y promedios de 5 repeticiones. Las
+gráficas de tiempo contra N y la de M llevan barras de error de ±1 desviación
+estándar. Las gráficas de búsqueda contra N muestran el tiempo total de
+M = 1000 búsquedas.
+
+- `busqueda_aleatorio.png` y `busqueda_ordenado.png`: tiempo de búsqueda contra
+  N, una curva por estructura.
+- `comparacion_busqueda.png`: las dos anteriores lado a lado. Los ejes
+  verticales no son iguales en los dos paneles.
+- `construccion_aleatorio.png` y `construccion_ordenado.png`: tiempo de
+  construir la estructura insertando los N estudiantes.
+- `rango_aleatorio.png` y `rango_ordenado.png`: tiempo de listar un rango de
+  100 IDs (o de N si N < 100).
+- `todos_aleatorio.png` y `todos_ordenado.png`: tiempo de listar todos los
+  estudiantes en orden de ID.
+- `alturas.png`: altura del árbol contra N. La línea del B+ ordenado queda
+  tapada por la del B+ aleatorio porque los valores son idénticos.
+- `experimento_M.png`: tiempo total de búsqueda al variar M (N = 10000, datos
+  aleatorios).
+
 ---
 
 ## Lo que encontré
 
-**1. La lista no distingue el orden.** Da casi lo mismo si los datos llegan
-ordenados o mezclados, porque siempre recorre todo. Su tiempo crece de forma
-lineal con N.
+Todas las cifras son con N = 30000 salvo que se indique otra cosa.
 
-**2. El ABB sí depende del orden.** Cuando los datos llegan ordenados el árbol
-se convierte en una lista (la altura queda igual a N), y la búsqueda se vuelve
-lenta. Con N = 30000 la altura del ABB ordenado fue 30000, mientras que en modo
-aleatorio fue apenas 36. La búsqueda del ABB ordenado terminó siendo incluso
-más lenta que la de la lista normal.
+**1. La lista no distingue el orden al buscar.** Tarda casi lo mismo con datos
+aleatorios que con ordenados, porque siempre recorre todo. Su tiempo crece de
+forma casi lineal con N.
 
-**3. El B+ se mantiene estable.** En todos los tamaños y en ambos modos su
-altura se quedó entre 1 y 3. Su tiempo de búsqueda es prácticamente el mismo
-sin importar si los datos llegaron ordenados o no. Además es el más rápido
-haciendo búsquedas por rango: en N = 30000 tardó unos 43 microsegundos, contra
-1476 de la lista y 1345 del ABB.
+**2. El ABB sí depende del orden.** Con datos ordenados su altura es 30000
+(con aleatorios, 36). La búsqueda pasa de unos 4 microsegundos (aleatorio) a
+casi 1600 microsegundos (ordenado), o sea unas 2,6 veces **más lenta que la
+lista**. Construirlo con datos ordenados tardó 52,8 segundos, mientras que con
+datos aleatorios fue de 105 milisegundos.
 
-**4. Con datos muy pequeños la lista gana.** Con N = 10 la lista fue la más
+**3. El B+ no depende del orden.** Su altura estuvo entre 1 y 3 en todos los
+casos, y buscar tarda prácticamente lo mismo con datos aleatorios que con
+ordenados (unos 2,4 microsegundos).
+
+**4. Rango y listar todos.** Con datos ordenados el rango del ABB casi se
+iguala al de la lista, porque el árbol es una cadena y pierde su ventaja. El
+B+ en cambio sigue siendo el más rápido:
+
+| Operación | Datos | Lista | ABB | B+ |
+|---|---|---|---|---|
+| Rango (ancho 100) | aleatorios | 2109 µs | 90 µs | 47 µs |
+| Rango (ancho 100) | ordenados | 1476 µs | 1345 µs | 43 µs |
+| Listar todos | aleatorios | 8,3 ms | 10,4 ms | 0,41 ms |
+| Listar todos | ordenados | 2,1 ms | 10,4 ms | 0,32 ms |
+
+**5. Con datos muy pequeños la lista gana.** Con N = 10 la lista fue la más
 rápida. Tiene sentido: el ABB y el B+ tienen más costos fijos (crear objetos,
 seguir punteros), y cuando hay poquitos datos esos costos pesan más que la
 ventaja de la búsqueda logarítmica. El cruce donde el ABB empieza a ganar
-aparece alrededor de N = 30.
+aparece alrededor de N = 30, pero solo con datos aleatorios: con datos
+ordenados nunca le gana a la lista.
 
-**5. La lista es más rápida listando datos ya ordenados.** Esto me llamó la
-atención al principio, pero no es un error. Python usa un algoritmo llamado
-Timsort que detecta cuando los datos ya vienen ordenados y los recorre mucho
-más rápido. Es una propiedad del lenguaje, no del algoritmo.
+**6. Construcción.** La lista es la más rápida siempre, porque solo añade al
+final: 3,1 milisegundos contra 72,6 milisegundos del B+ (unas 24 veces más) y
+105 milisegundos del ABB, con datos aleatorios. Los árboles pagan en la
+construcción lo que ganan al buscar.
 
-**6. El B+ fue el mejor en general.** Búsqueda puntual, búsqueda por rango,
+**7. La lista es más rápida listando datos ya ordenados.** Con N = 30000,
+listar tarda 8,3 milisegundos con datos aleatorios y 2,1 milisegundos con
+ordenados. Esto me llamó la atención al principio, pero no es un error. Python
+usa un algoritmo llamado Timsort que detecta cuando los datos ya vienen
+ordenados y los recorre mucho más rápido. Es una propiedad del lenguaje, no
+del algoritmo.
+
+**8. El B+ fue el mejor en general.** Búsqueda puntual, búsqueda por rango,
 listar todos y construcción: en ninguno de esos casos el B+ quedó mal parado.
 Es el único que no se afecta por el orden en que llegan los datos.
 
@@ -147,12 +219,14 @@ py lab3.py
 Generar las gráficas:
 
 ```
-py graficar.py
+py grafica.py
 ```
 
 Los resultados quedan en `resultados/` y las gráficas en `graficas/`. El
-experimento usa una semilla fija, así que los datos y los tiempos son
-reproducibles en el mismo equipo.
+experimento usa una semilla fija, así que los datos generados son los mismos,
+pero los tiempos pueden variar un poco de una ejecución a otra. Las gráficas y
+los CSV ya están en el repositorio, así que no hace falta volver a correr el
+experimento para verlos.
 
 ---
 
@@ -161,7 +235,7 @@ reproducibles en el mismo equipo.
 ```
 proyecto/
 ├── lab3.py
-├── graficar.py
+├── grafica.py
 ├── requirements.txt
 ├── README.md
 ├── CODIGO_DE_HONOR.md
@@ -182,7 +256,6 @@ proyecto/
     ├── todos_aleatorio.png
     └── todos_ordenado.png
 ```
-
 ## entorno
 - Procesador	Intel(R) Core(TM) i3-1005G1 CPU @ 1.20GHz   1.19 GHz
 - RAM instalada	16,0 GB (15,8 GB usable)
